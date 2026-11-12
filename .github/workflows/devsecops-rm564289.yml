@@ -50,7 +50,7 @@ jobs:
       - run: python -m pip install semgrep==1.185.0
       - run: |
           mkdir -p reports
-          semgrep scan --config p/python --config p/flask --config p/owasp-top-ten --config ci/sast-citizen.json --metrics off --severity ERROR --error --json --output reports/sast.json app.py loja worker templates
+          semgrep scan --config p/python --config p/flask --config p/owasp-top-ten --config ci/sast-citizen.json --metrics off --strict --severity ERROR --error --json --output reports/sast.json app.py loja worker templates ci
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -182,12 +182,13 @@ jobs:
         run: |
           mkdir -p reports
           chmod 777 reports
-          python3 ci/scan_gate.py zap reports/dast.json docker run --rm --network host --memory 2g -v "$PWD/reports:/zap/wrk:rw" -v "$PWD/ci/zap_seed.py:/zap/seed.py:ro" ghcr.io/zaproxy/zaproxy@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af zap-full-scan.py -t http://127.0.0.1:8231 -J dast.json -a --hook /zap/seed.py
+          python3 ci/scan_gate.py zap reports/dast.json docker run --rm --network host --memory 2g --env-file "$RUNNER_TEMP/market.env" -v "$PWD/reports:/zap/wrk:rw" -v "$PWD/ci/zap_seed.py:/zap/seed.py:ro" ghcr.io/zaproxy/zaproxy@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af zap-full-scan.py -t http://127.0.0.1:8231 -J dast.json -a --hook /zap/seed.py
+          python3 -c 'import json; d=json.load(open("reports/dast-coverage.json")); assert d["authenticated_endpoints"] == 6; assert sum(r.get("requires_authentication",False) and r["status"] == 200 for r in d["requests"]) == 6'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: dast-RM564289
-          path: reports/dast.json
+          path: reports/dast*.json
           if-no-files-found: error
           retention-days: 14
       - name: Encerrar aplicação de teste
@@ -195,28 +196,37 @@ jobs:
         run: docker rm -f market-dast
 
   deploy:
-    name: 8 - Publicação protegida
+    name: 8 - Deploy no WSL
     needs: [build, sast, segredos, sca, testes, imagem, dast]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment:
       name: producao
+      url: ${{ steps.rollout.outputs.environment_url }}
     permissions:
       contents: read
-      packages: write
+      deployments: read
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: imagem-aprovada-RM564289
           path: ${{ runner.temp }}
-      - name: Publicar imagem aprovada no GHCR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Preparar pedido de deploy da imagem aprovada
         run: |
           docker load -i "$RUNNER_TEMP/market-image.tar"
-          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          image="ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}"
-          docker tag ctmarket-secure:564289 "$image"
-          docker push "$image"
-          printf 'Imagem aprovada publicada: `%s`\n' "$image" >> "$GITHUB_STEP_SUMMARY"
+          python3 ci/request_deploy.py "$RUNNER_TEMP/market-image.tar" "$RUNNER_TEMP/request.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: deploy-request-RM564289-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/request.json
+          if-no-files-found: error
+          retention-days: 2
+      - name: Confirmar implantação e saúde no WSL
+        id: rollout
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 ci/wait_deploy.py

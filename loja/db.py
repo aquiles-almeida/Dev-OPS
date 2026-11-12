@@ -27,6 +27,8 @@ def produto_por_id(pid):
         product_id = int(pid)
     except (ValueError, TypeError):
         raise ValueError('Identificador inválido.') from None
+    if not 1 <= product_id <= 9223372036854775807:
+        raise ValueError('Identificador fora do intervalo permitido.')
     con = conectar()
     try:
         row = con.execute('SELECT id,nome,preco FROM produtos WHERE id=?', (product_id,)).fetchone()

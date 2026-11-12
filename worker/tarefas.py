@@ -1,6 +1,8 @@
 """Worker sem pickle e sem execução de comandos de shell."""
 import json
+import os
 from pathlib import Path
+import tempfile
 
 from PIL import Image
 
@@ -22,5 +24,14 @@ def miniatura(arquivo, base='/tmp/ct-imagens'):
     with Image.open(path) as image:
         image.thumbnail((200,200))
         destination = root / 'miniatura.png'
-        image.save(destination, format='PNG')
+        temporary = None
+        try:
+            # A criação exclusiva não segue um link de saída já existente.
+            with tempfile.NamedTemporaryFile(dir=root, prefix='.miniatura-', suffix='.png', delete=False) as stream:
+                temporary = Path(stream.name)
+                image.save(stream, format='PNG')
+            os.replace(temporary, destination)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
     return str(destination)

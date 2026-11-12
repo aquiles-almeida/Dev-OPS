@@ -102,3 +102,64 @@ def test_worker_rejects_untrusted_data():
         processar('{"tipo":"execute"}')
     with pytest.raises(ValueError):
         miniatura('../../etc/passwd')
+
+
+@pytest.mark.parametrize('identifier',['9223372036854775808','-1','0','9'*5000])
+def test_product_identifier_limits(client, identifier):
+    assert client.get('/produto',query_string={'id':identifier}).status_code == 400
+
+
+@pytest.mark.parametrize('changes',[{'exp':1},{'iss':'other'},{'aud':'other'},{'papel':'usuario'}])
+def test_invalid_jwt_claims_and_user_role(client, monkeypatch, changes):
+    import os
+    valid = token(client)['Authorization'][7:]
+    claims = jwt.decode(valid,os.environ['APP_SECRET'],algorithms=['HS256'],audience='ctmarket-api',issuer='ctmarket')
+    invalid = jwt.encode({**claims,**changes},os.environ['APP_SECRET'],algorithm='HS256')
+    assert client.get('/admin/painel',headers={'Authorization':'Bearer '+invalid}).status_code == 403
+
+
+def test_worker_does_not_follow_output_symlink(tmp_path):
+    from PIL import Image
+    from worker.tarefas import miniatura
+    root=tmp_path/'allowed'
+    root.mkdir()
+    marker=tmp_path/'outside'
+    marker.write_bytes(b'audit-marker')
+    Image.new('RGB',(2,2)).save(root/'input.png')
+    (root/'miniatura.png').symlink_to(marker)
+    result=miniatura('input.png',base=str(root))
+    assert marker.read_bytes()==b'audit-marker'
+    assert not (root/'miniatura.png').is_symlink()
+    with Image.open(result) as image:
+        assert image.size==(2,2)
+
+
+def test_zap_hook_authenticates_all_typed_endpoints(client, monkeypatch, tmp_path):
+    import json
+    from types import SimpleNamespace
+    from urllib.parse import urlsplit
+    from ci import zap_seed
+    state={}
+    def add_rule(_description,_enabled,_kind,_regex,_header,replacement,**_kwargs):
+        state['Authorization']=replacement
+    def send_request(raw,**_kwargs):
+        head,body=raw.split('\r\n\r\n',1)
+        first,*lines=head.split('\r\n')
+        method,url,_version=first.split(' ',2)
+        headers=dict(line.split(': ',1) for line in lines)
+        headers.update(state)
+        response=client.open(urlsplit(url).path+('?' + urlsplit(url).query if urlsplit(url).query else ''),
+                             method=method,headers=headers,data=body)
+        return [{'responseHeader':'HTTP/1.1 '+response.status+'\r\n',
+                 'responseBody':response.get_data(as_text=True)}]
+    monkeypatch.setenv('GS_ZAP_USERNAME','test-operator')
+    monkeypatch.setenv('GS_ZAP_PASSWORD',client.test_password)
+    destination=tmp_path/'coverage.json'
+    monkeypatch.setenv('GS_ZAP_COVERAGE_PATH',str(destination))
+    zap=SimpleNamespace(core=SimpleNamespace(send_request=send_request),
+                        replacer=SimpleNamespace(add_rule=add_rule))
+    zap_seed.zap_started(zap,'http://127.0.0.1:8231')
+    report=json.loads(destination.read_text())
+    protected=[r for r in report['requests'] if r.get('requires_authentication')]
+    assert len(protected)==6 and all(r['status']==200 for r in protected)
+    assert {r['content_type'] for r in protected if r['method']=='POST'}=={'application/json','application/yaml','application/xml'}

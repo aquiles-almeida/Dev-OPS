@@ -9,6 +9,18 @@ regex = '''(?i)\b(?:password|passwd|senha|secret_key|api_token|aws_secret_access
 secretGroup = 1
 
 [[rules]]
+id = "citizen-session-config"
+description = "Chave literal atribuida a configuracao de sessao"
+regex = '''(?i)\bconfig\s*\[\s*["']SECRET_KEY["']\s*\]\s*=\s*["']([^"'\r\n]{12,})["']'''
+secretGroup = 1
+
+[[rules]]
+id = "citizen-jwt-signing-key"
+description = "Chave literal passada a assinatura JWT"
+regex = '''(?i)\bjwt\.encode\([^\r\n]+?,\s*["']([^"'\r\n]{12,})["']\s*[,)]'''
+secretGroup = 1
+
+[[rules]]
 id = "citizen-compose-password"
 description = "Credencial literal em compose"
 regex = '''(?m)^[ \t]*POSTGRES_PASSWORD:[ \t]*([A-Za-z0-9_@.!/+\-]{12,})[ \t]*$'''
