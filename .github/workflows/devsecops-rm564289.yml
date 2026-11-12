@@ -60,7 +60,7 @@ jobs:
           retention-days: 14
 
   segredos:
-    name: 3 - Segredos
+    name: 3 - Segredos (Gitleaks)
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -168,7 +168,7 @@ jobs:
           name: imagem-aprovada-RM564289
           path: ${{ runner.temp }}
       - run: |
-          docker load -i "$RUNNER_TEMP/market-image.tar"
+          docker load --input "$RUNNER_TEMP/market-image.tar"
           python3 ci/prepare_runtime.py "$RUNNER_TEMP/market.env"
           docker run -d --name market-dast --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m --cap-drop ALL --security-opt no-new-privileges --memory 512m --pids-limit 128 --env-file "$RUNNER_TEMP/market.env" -p 127.0.0.1:8231:8231 ctmarket-secure:564289
       - name: Aguardar aplicação
@@ -217,7 +217,7 @@ jobs:
           persist-credentials: false
       - name: Preparar pedido de deploy da imagem aprovada
         run: |
-          docker load -i "$RUNNER_TEMP/market-image.tar"
+          docker load --input "$RUNNER_TEMP/market-image.tar"
           python3 ci/request_deploy.py "$RUNNER_TEMP/market-image.tar" "$RUNNER_TEMP/request.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
