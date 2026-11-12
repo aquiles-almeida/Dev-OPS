@@ -83,8 +83,12 @@ def test_parsers(client):
 
 def test_login_rate_limit(client):
     for _ in range(10):
-        assert client.post('/login', data={'usuario':'unknown','senha':'invalid'}).status_code == 401
-    assert client.post('/login').status_code == 429
+        failed=client.post('/login', data={'usuario':'unknown','senha':'invalid'})
+        assert failed.status_code == 401
+    blocked=client.post('/login')
+    assert blocked.status_code == 429
+    assert blocked.json==failed.json=={'autenticado':False}
+    assert blocked.headers['Retry-After']=='60'
 
 
 def test_security_headers(client):

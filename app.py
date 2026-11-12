@@ -76,7 +76,7 @@ def create_app():
             while recent and recent[0] < now - 60:
                 recent.popleft()
             if len(recent) >= 10:
-                return jsonify(erro='Tente novamente mais tarde.'), 429
+                return jsonify(autenticado=False), 429, {'Retry-After':'60'}
             recent.append(now)
         username = request.form.get('usuario', '')[:100]
         password = request.form.get('senha', '')[:256]
