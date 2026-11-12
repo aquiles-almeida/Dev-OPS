@@ -182,7 +182,7 @@ jobs:
         run: |
           mkdir -p reports
           chmod 777 reports
-          python3 ci/scan_gate.py zap reports/dast.json docker run --rm --network host --memory 2g --env-file "$RUNNER_TEMP/market.env" -v "$PWD/reports:/zap/wrk:rw" -v "$PWD/ci/zap_seed.py:/zap/seed.py:ro" ghcr.io/zaproxy/zaproxy@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af zap-full-scan.py -t http://127.0.0.1:8231 -J dast.json -a --hook /zap/seed.py
+          python3 ci/scan_gate.py zap reports/dast.json docker run --rm --network host --memory 4g --cpus 2 --env-file "$RUNNER_TEMP/market.env" -v "$PWD/reports:/zap/wrk:rw" -v "$PWD/ci/zap_seed.py:/zap/seed.py:ro" ghcr.io/zaproxy/zaproxy@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af zap-full-scan.py -t http://127.0.0.1:8231 -J dast.json -a --hook /zap/seed.py -z "-Xmx1024m -config ascan.threadPerHost=2"
           python3 -c 'import json; d=json.load(open("reports/dast-coverage.json")); assert d["authenticated_endpoints"] == 6; assert sum(r.get("requires_authentication",False) and r["status"] == 200 for r in d["requests"]) == 6'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
