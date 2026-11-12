@@ -137,7 +137,8 @@ def create_app():
     @app.route('/admin/nfe', methods=['POST'])
     @authenticated
     def nfe():
-        return jsonify(admin.ler_nfe(request.get_data()))
+        admin.ler_nfe(request.get_data())
+        return jsonify(status='validada')
 
     @app.route('/admin/relatorio')
     @authenticated

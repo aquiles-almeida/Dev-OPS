@@ -163,3 +163,21 @@ def test_zap_hook_authenticates_all_typed_endpoints(client, monkeypatch, tmp_pat
     protected=[r for r in report['requests'] if r.get('requires_authentication')]
     assert len(protected)==6 and all(r['status']==200 for r in protected)
     assert {r['content_type'] for r in protected if r['method']=='POST'}=={'application/json','application/yaml','application/xml'}
+
+
+@pytest.mark.parametrize('document',[
+    '<nfe><emitente>teste</emitente></nfe>',
+    '<nfe><emitente>teste</emitente><valor>nfe</valor></nfe>',
+    '<nfe><emitente>teste</emitente><valor>NaN</valor></nfe>',
+    '<nfe><emitente>teste</emitente><valor>Infinity</valor></nfe>',
+    '<nfe><emitente>teste</emitente><valor>-1</valor></nfe>',
+    '<nfe><emitente>teste</emitente><valor>1000001</valor></nfe>',
+    '<nfe><emitente>teste</emitente><valor>1</valor><valor>2</valor></nfe>',
+])
+def test_nfe_requires_schema_and_numeric_value(client,document):
+    assert client.post('/admin/nfe',data=document,headers=token(client)).status_code==400
+
+
+def test_nfe_ack_does_not_reflect_user_input(client):
+    response=client.post('/admin/nfe',data='<nfe><emitente>qa-name</emitente><valor>10</valor></nfe>',headers=token(client))
+    assert response.json=={'status':'validada'}
