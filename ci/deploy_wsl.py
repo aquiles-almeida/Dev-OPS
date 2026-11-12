@@ -2,15 +2,14 @@
 import argparse
 import hashlib
 import io
+import ipaddress
 import json
 import os
 from pathlib import Path
 import pwd
 import re
 import shutil
-import socket
 import subprocess
-import sys
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -101,6 +100,7 @@ def prepare_host():
     environment=ROOT/'app.env'
     if not environment.exists():
         values=runtime_values()
+        values['ADMIN_USERNAME']='aquiles'
         values['LOJA_DB']='/data/market.db'
         fd=os.open(environment,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
         with os.fdopen(fd,'w') as stream:
@@ -129,6 +129,9 @@ def launch(name, image_id, ports, sha):
 
 
 def rollout(image_id, sha, run_id, attempt):
+    address=json.loads(subprocess.check_output(['ip','-j','-4','route','get','1.1.1.1'],text=True))[0]['prefsrc']
+    if ipaddress.ip_address(address).version!=4:
+        raise ValueError('The deployment needs the current WSL IPv4 address.')
     prepare_host()
     candidate=f'{CONTAINER}-candidate-{run_id}-{attempt}'
     backup=f'{CONTAINER}-rollback-{run_id}-{attempt}'
@@ -143,7 +146,6 @@ def rollout(image_id, sha, run_id, attempt):
     if existing:
         docker('stop',CONTAINER)
         docker('rename',CONTAINER,backup)
-    address=json.loads(subprocess.check_output(['ip','-j','-4','route','get','1.1.1.1'],text=True))[0]['prefsrc']
     try:
         launch(CONTAINER,image_id,['127.0.0.1:8232:8231',address+':8232:8231'],sha)
         health('http://127.0.0.1:8232/health')
