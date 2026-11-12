@@ -1,7 +1,7 @@
 FROM python:3.12-alpine@sha256:c5ba3deef00c7758561a0f03c26f44f10589263d40e732b8748e0d1f38f6dd89
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORTA=8231
 WORKDIR /app
-RUN addgroup -g 10001 market && adduser -D -H -u 10001 -G market market
+RUN apk upgrade --no-cache && addgroup -g 10001 market && adduser -D -H -u 10001 -G market market
 COPY requirements.txt /app/requirements.txt
 COPY worker/requirements.txt /app/worker/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt -r worker/requirements.txt
