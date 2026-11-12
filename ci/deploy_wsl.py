@@ -19,8 +19,10 @@ import zipfile
 
 if __package__:
     from .prepare_runtime import runtime_values
+    from .image_identity import archive_identity, verify_loaded_image
 else:
     from prepare_runtime import runtime_values
+    from image_identity import archive_identity, verify_loaded_image
 
 REPOSITORY='aquiles-almeida/Dev-OPS'
 WORKFLOW='.github/workflows/devsecops-rm564289.yml'
@@ -213,13 +215,16 @@ def main():
         with tempfile.NamedTemporaryFile(suffix='.tar') as stream:
             stream.write(archive)
             stream.flush()
+            identity=archive_identity(stream.name)
+            if identity['config_digest']!=request['image_config_sha256']:
+                raise ValueError('Canonical image configuration digest does not match.')
             docker('load','-i',stream.name)
-        inspected=docker('image','inspect','ctmarket-secure:564289','--format','{{.Id}}',capture=True)
-        if inspected!=request['image_id']:
-            raise ValueError('Loaded image differs from the approved image.')
-        url=rollout(request['image_id'],args.sha,args.run,attempt)
+        inspected=json.loads(docker('image','inspect','ctmarket-secure:564289',capture=True))[0]
+        local_image_id=verify_loaded_image(identity,inspected)
+        url=rollout(local_image_id,args.sha,args.run,attempt)
         evidence={'repository':REPOSITORY,'run_id':args.run,'run_attempt':attempt,'sha':args.sha,
-                  'image_id':request['image_id'],'archive_sha256':request['archive_sha256'],
+                  'image_id':local_image_id,'approved_image_id':request['image_id'],
+                  'image_config_sha256':identity['config_digest'],'archive_sha256':request['archive_sha256'],
                   'environment_url':url,'health':'healthy','deployed_at':datetime.now(timezone.utc).isoformat()}
         (ROOT/'deployment.json').write_text(json.dumps(evidence,indent=2)+'\n')
         gh_api(status_endpoint,{'state':'success','description':prefix+': healthy','environment_url':url,

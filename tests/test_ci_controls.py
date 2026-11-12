@@ -7,6 +7,9 @@ import pytest
 import hashlib
 import io
 import zipfile
+import tarfile
+import json
+from ci.image_identity import archive_identity, verify_loaded_image
 
 
 def test_runtime_password_is_random_and_compatible():
@@ -73,3 +76,31 @@ def test_deploy_artifact_integrity(monkeypatch):
     artifact['digest']='sha256:'+'0'*64
     with pytest.raises(ValueError):
         deploy_wsl.read_artifact(artifact,'request.json')
+
+
+def test_archive_uses_canonical_configuration_digest(tmp_path):
+    config={'config':{'User':'10001:10001'},'rootfs':{'diff_ids':['sha256:'+'a'*64]},'architecture':'amd64','os':'linux'}
+    raw=json.dumps(config).encode()
+    path=tmp_path/'image.tar'
+    with tarfile.open(path,'w') as archive:
+        for name,data in [('manifest.json',json.dumps([{'Config':'config.json'}]).encode()),('config.json',raw)]:
+            info=tarfile.TarInfo(name)
+            info.size=len(data)
+            archive.addfile(info,io.BytesIO(data))
+    identity=archive_identity(path)
+    assert identity['config_digest']=='sha256:'+hashlib.sha256(raw).hexdigest()
+
+
+def test_loaded_image_identity_rejects_different_content():
+    identity={'config_digest':'sha256:'+'a'*64,'runtime_config':{'User':'10001:10001','Cmd':['app']},
+              'diff_ids':['sha256:'+'b'*64],'architecture':'amd64','os':'linux'}
+    inspected={'Id':'sha256:'+'c'*64,'Config':dict(identity['runtime_config']),
+               'RootFS':{'Layers':list(identity['diff_ids'])},'Architecture':'amd64','Os':'linux'}
+    assert verify_loaded_image(identity,inspected)==inspected['Id']
+    inspected['Config']['User']='root'
+    with pytest.raises(ValueError):
+        verify_loaded_image(identity,inspected)
+    inspected['Config']['User']='10001:10001'
+    inspected['RootFS']['Layers']=['sha256:'+'d'*64]
+    with pytest.raises(ValueError):
+        verify_loaded_image(identity,inspected)

@@ -58,7 +58,10 @@ XML com entidades e expressões de custo excessivo.
    e usa o ambiente protegido `producao`. Publica um pedido com o SHA256 do
    arquivo de imagem e o ID imutável da imagem já analisada. O agente local do
    WSL verifica o run, o commit, os sete gates, a liberação do job protegido e
-   os digests dos artefatos; implanta exatamente essa imagem e confirma o
+   os digests dos artefatos, o digest canônico da configuração, as camadas e
+   os parâmetros de execução. A verificação funciona com Docker clássico e
+   containerd, que podem apresentar IDs internos diferentes. O agente executa
+   o ID local imutável já conferido, implanta exatamente essa imagem e confirma o
    HTTP `/health` e o HEALTHCHECK do Docker. O job só passa após essa confirmação.
 
 As actions são fixadas por SHA. O token tem somente leitura por padrão; apenas o
