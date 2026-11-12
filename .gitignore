@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.env
+.env.*
+*.db
+*.tar
+reports/
+deploy/id_rsa
+*.pem
+*.key

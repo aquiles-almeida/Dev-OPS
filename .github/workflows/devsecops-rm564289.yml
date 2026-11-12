@@ -1,0 +1,222 @@
+name: Citizen Tech DevSecOps - RM564289
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devsecops-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: 1 - Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install -r requirements.txt -r worker/requirements.txt
+          python -m pip check
+          python -m compileall -q app.py loja worker
+
+  sast:
+    name: 2 - SAST
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install semgrep==1.185.0
+      - run: |
+          mkdir -p reports
+          semgrep scan --config p/python --config p/flask --config p/owasp-top-ten --config ci/sast-citizen.json --metrics off --severity ERROR --error --json --output reports/sast.json app.py loja worker templates
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: sast-RM564289
+          path: reports/sast.json
+          if-no-files-found: error
+          retention-days: 14
+
+  segredos:
+    name: 3 - Segredos
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python3 ci/install_tools.py
+      - run: python3 ci/secrets_gate.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: segredos-RM564289
+          path: reports/segredos-*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  sca:
+    name: 4 - SCA
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: python3 ci/install_tools.py
+      - run: |
+          mkdir -p reports
+          trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output reports/sca.json .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sca-RM564289
+          path: reports/sca.json
+          if-no-files-found: error
+          retention-days: 14
+
+  testes:
+    name: 5 - Testes
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt -r worker/requirements.txt pytest==9.2.0
+      - run: |
+          mkdir -p reports
+          python -m pytest -q --junitxml=reports/testes.xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: testes-RM564289
+          path: reports/testes.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  imagem:
+    name: 6 - Build e análise da imagem
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: python3 ci/install_tools.py
+      - run: |
+          mkdir -p reports
+          trivy config --severity HIGH,CRITICAL --exit-code 1 --format json --output reports/trivy-config.json .
+      - run: docker build --tag ctmarket-secure:564289 .
+      - run: trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output reports/trivy-image.json ctmarket-secure:564289
+      - run: docker save ctmarket-secure:564289 -o "$RUNNER_TEMP/market-image.tar"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: imagem-aprovada-RM564289
+          path: ${{ runner.temp }}/market-image.tar
+          if-no-files-found: error
+          retention-days: 2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: imagem-relatorios-RM564289
+          path: reports/trivy-*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  dast:
+    name: 7 - DAST ativo
+    needs: imagem
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: imagem-aprovada-RM564289
+          path: ${{ runner.temp }}
+      - run: |
+          docker load -i "$RUNNER_TEMP/market-image.tar"
+          python3 ci/prepare_runtime.py "$RUNNER_TEMP/market.env"
+          docker run -d --name market-dast --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m --cap-drop ALL --security-opt no-new-privileges --memory 512m --pids-limit 128 --env-file "$RUNNER_TEMP/market.env" -p 127.0.0.1:8231:8231 ctmarket-secure:564289
+      - name: Aguardar aplicação
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8231/health; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Varredura completa e gate HIGH
+        run: |
+          mkdir -p reports
+          chmod 777 reports
+          python3 ci/scan_gate.py zap reports/dast.json docker run --rm --network host --memory 2g -v "$PWD/reports:/zap/wrk:rw" -v "$PWD/ci/zap_seed.py:/zap/seed.py:ro" ghcr.io/zaproxy/zaproxy@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af zap-full-scan.py -t http://127.0.0.1:8231 -J dast.json -a --hook /zap/seed.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dast-RM564289
+          path: reports/dast.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Encerrar aplicação de teste
+        if: always()
+        run: docker rm -f market-dast
+
+  deploy:
+    name: 8 - Publicação protegida
+    needs: [build, sast, segredos, sca, testes, imagem, dast]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: producao
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: imagem-aprovada-RM564289
+          path: ${{ runner.temp }}
+      - name: Publicar imagem aprovada no GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker load -i "$RUNNER_TEMP/market-image.tar"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}"
+          docker tag ctmarket-secure:564289 "$image"
+          docker push "$image"
+          printf 'Imagem aprovada publicada: `%s`\n' "$image" >> "$GITHUB_STEP_SUMMARY"

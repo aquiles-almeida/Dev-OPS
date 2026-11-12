@@ -1,0 +1,428 @@
+{
+  "rules": [
+    {
+      "id": "citizen.sql-injection",
+      "message": "SQL interpolado permite SQL injection.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-89"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "$C.execute($Q % $V, ...)"
+        },
+        {
+          "pattern": "$C.execute(f\"...\", ...)"
+        },
+        {
+          "pattern": "$C.execute($Q + $V, ...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.shell-injection",
+      "message": "Comando em shell constru\u00eddo com dados din\u00e2micos.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-78"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "subprocess.$F(..., shell=True, ...)"
+        },
+        {
+          "pattern": "os.system(...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.eval",
+      "message": "Avalia\u00e7\u00e3o arbitr\u00e1ria de express\u00e3o Python.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-95"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "eval(...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.exec",
+      "message": "Execu\u00e7\u00e3o arbitr\u00e1ria de c\u00f3digo Python.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-94"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "exec(...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.pickle",
+      "message": "Desserializa\u00e7\u00e3o insegura com pickle.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-502"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "pickle.loads(...)"
+        },
+        {
+          "pattern": "pickle.load(...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.yaml",
+      "message": "Loader inseguro permite construir objetos Python.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-502"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "yaml.load(..., Loader=yaml.Loader, ...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.tls",
+      "message": "Valida\u00e7\u00e3o do certificado TLS desativada.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-295"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "requests.$F(..., verify=False, ...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.world-writable",
+      "message": "Permiss\u00f5es permitem altera\u00e7\u00e3o por qualquer usu\u00e1rio.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-732"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "os.chmod(..., 0o777)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.md5",
+      "message": "MD5 inadequado para senhas e integridade sens\u00edvel.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-327"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "hashlib.md5(...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.sha1-session",
+      "message": "SHA1 determin\u00edstico usado na gera\u00e7\u00e3o de sess\u00e3o.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-330"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "hashlib.sha1(...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.jwt-unverified",
+      "message": "JWT decodificado sem verificar assinatura.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-347"
+        ]
+      },
+      "pattern-regex": "jwt\\.decode\\([^\\n]*verify_signature[^\\n]*False"
+    },
+    {
+      "id": "citizen.flask-debug",
+      "message": "Depurador Flask habilitado na aplica\u00e7\u00e3o.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-489"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "$APP.run(..., debug=True, ...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.ssti",
+      "message": "Template gerado com dados da requisi\u00e7\u00e3o.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-1336"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "render_template_string($MODEL, ...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.xss-safe",
+      "message": "Filtro safe desativa o escape de entrada do usu\u00e1rio.",
+      "severity": "ERROR",
+      "languages": [
+        "generic"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-79"
+        ]
+      },
+      "pattern-regex": "\\{\\{[^\\n}]*\\|\\s*safe\\s*\\}\\}"
+    },
+    {
+      "id": "citizen.xss-response",
+      "message": "HTML de resposta interpolado com entrada.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-79"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "return \"...\" % $X"
+        }
+      ]
+    },
+    {
+      "id": "citizen.open-redirect",
+      "message": "Destino de redirecionamento controlado pelo cliente.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-601"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "redirect(request.args.get(...))"
+        }
+      ]
+    },
+    {
+      "id": "citizen.path-traversal",
+      "message": "Abertura de caminho constru\u00eddo a partir de nome n\u00e3o validado.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-22"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "open(os.path.join($BASE, $NAME), ...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.ssrf",
+      "message": "Requisi\u00e7\u00e3o a URL vari\u00e1vel sem valida\u00e7\u00e3o de destino.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-918"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "requests.get($URL, timeout=5)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.xml-parser",
+      "message": "XML n\u00e3o confi\u00e1vel analisado sem defesa contra expans\u00e3o de entidades.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-776"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "ET.fromstring(...)"
+        }
+      ]
+    },
+    {
+      "id": "citizen.hardcoded-key",
+      "message": "Chave de sess\u00e3o fixa no c\u00f3digo.",
+      "severity": "ERROR",
+      "languages": [
+        "python"
+      ],
+      "metadata": {
+        "category": "security",
+        "confidence": "HIGH",
+        "impact": "HIGH",
+        "cwe": [
+          "CWE-798"
+        ]
+      },
+      "pattern-either": [
+        {
+          "pattern": "$APP.config[\"SECRET_KEY\"] = \"...\""
+        }
+      ]
+    }
+  ]
+}
